@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:jee="http://www.springframework.org/schema/jee" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.springframework.org/schema/tx
+http://www.springframework.org/schema/tx/spring-tx-3.1.xsd
+http://www.springframework.org/schema/jee
+http://www.springframework.org/schema/jee/spring-jee-3.1.xsd
+http://www.springframework.org/schema/aop
+http://www.springframework.org/schema/aop/spring-aop-3.1.xsd
+http://www.springframework.org/schema/context
+http://www.springframework.org/schema/context/spring-context-3.1.xsd">
+
+	<bean
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="systemPropertiesModeName" value="SYSTEM_PROPERTIES_MODE_OVERRIDE" />
+		<property name="ignoreResourceNotFound" value="true" />
+		<property name="locations">
+			<list>
+				<value>classpath*:/application.properties</value>
+			</list>
+		</property>
+	</bean>
+
+
+	<context:component-scan
+		base-package="
+		com.capcare.harbor.handler.devcie.leader6907,
+		com.capcare.harbor.dao,
+		com.capcare.harbor.service,
+		com.capcare.harbor.handler
+	" />
+
+	<!-- **************** TCP Server Section **************** -->
+	<bean id="ioAcceptor" class="org.apache.mina.transport.socket.nio.NioSocketAcceptor">
+		<property name="defaultLocalAddress" value=":${harbor.port}"></property>
+		<property name="handler" ref="tcrIoHandler" />
+		<property name="filterChainBuilder" ref="filterChainBuilder" />
+	</bean>
+
+	<bean id="sessionConfig" factory-bean="ioAcceptor" factory-method="getSessionConfig">
+		<property name="TcpNoDelay" value="true"></property>
+		<property name="readerIdleTime" value="31" />
+		<property name="writerIdleTime" value="1" />
+		<property name="bothIdleTime" value="3" />
+		<property name="receiveBufferSize" value="1024" />
+		<property name="soLinger" value="0" />
+	</bean>
+
+	<bean id="filterChainBuilder"
+		class="org.apache.mina.core.filterchain.DefaultIoFilterChainBuilder">
+		<property name="filters">
+			<map>
+				<entry key="codecFilter" value-ref="tcrCodecFilter" />
+				<entry key="loggingFilter" value-ref="loggingFilter" />
+			</map>
+		</property>
+	</bean>
+
+	<bean id="tcrCodecFilter" class="org.apache.mina.filter.codec.ProtocolCodecFilter">
+		<constructor-arg index="0">
+			<ref bean="tcrCodecFactory" />
+		</constructor-arg>
+	</bean>
+
+	<bean id="loggingFilter" class="org.apache.mina.filter.logging.LoggingFilter" />
+
+	<bean class="org.springframework.beans.factory.config.CustomEditorConfigurer">
+		<property name="customEditors">
+			<map>
+				<entry key="java.net.SocketAddress"
+					value="org.apache.mina.integration.beans.InetSocketAddressEditor" />
+			</map>
+		</property>
+	</bean>
+	<!-- 设备类型 -->
+	<bean id="device_eelink" class="com.capcare.harbor.handler.device.eelink.EELink" />
+	<bean id="device_m2616" class="com.capcare.harbor.handler.device.m2616.M2616" />
+	<bean id="device_mt90" class="com.capcare.harbor.handler.device.mt90.MT90" />
+	<bean id="device_t808" class="com.capcare.harbor.handler.device.t808.T808" />
+	<bean id="device_beidou" class="com.capcare.harbor.handler.device.beidou.Beidou" />
+	<bean id="device_chengan" class="com.capcare.harbor.handler.device.chengan.Chengan"></bean>
+	<bean id="device_leader" class="com.capcare.harbor.handler.device.leader6920.Leader"></bean>
+	<!-- 设备协议解析 -->
+	<bean id="protocol_eelink" class="com.capcare.harbor.handler.device.eelink.EELinkProtocol" />
+	<bean id="protocol_m2616" class="com.capcare.harbor.handler.device.m2616.M2616Protocol" />
+	<bean id="protocol_mt90" class="com.capcare.harbor.handler.device.mt90.MT90Protocol" />
+	<bean id="protocol_t808" class="com.capcare.harbor.handler.device.t808.T808Protocol" />
+	<bean id="protocol_beidou" class="com.capcare.harbor.handler.device.beidou.BeidouProtocol" />
+	<bean id="protocol_chengan"
+		class="com.capcare.harbor.handler.device.chengan.ChenganProtocol" />
+	<bean id="protocol_leader"
+		class="com.capcare.harbor.handler.device.leader6920.LeaderProtocol" />
+
+
+	<bean id="deviceHandler" class="com.capcare.harbor.handler.device.DeviceHandler">
+		<property name="headMapping">
+			<map>
+				<entry key="#">
+					<ref local="device_m2616" />
+				</entry>
+				<entry key="$">
+					<ref local="device_mt90" />
+				</entry>
+				<entry key="gg">
+					<ref local="device_eelink" />
+				</entry>
+				<entry key="~">
+					<ref local="device_t808" />
+				</entry>
+				<entry key="%%">
+					<ref local="device_beidou" />
+				</entry>
+				<entry key="@">
+					<ref local="device_chengan" />
+				</entry>
+
+				<entry key="leader">
+					<ref local="device_leader" />
+				</entry>
+
+			</map>
+		</property>
+		<property name="processMapping">
+			<map>
+				<entry key-ref="device_m2616">
+					<ref local="protocol_m2616" />
+				</entry>
+				<entry key-ref="device_mt90">
+					<ref local="protocol_mt90" />
+				</entry>
+				<entry key-ref="device_eelink">
+					<ref local="protocol_eelink" />
+				</entry>
+				<entry key-ref="device_t808">
+					<ref local="protocol_t808" />
+				</entry>
+				<entry key-ref="device_beidou">
+					<ref local="protocol_beidou" />
+				</entry>
+				<entry key-ref="device_chengan">
+					<ref local="protocol_chengan" />
+				</entry>
+				<entry key-ref="device_leader">
+					<ref local="protocol_leader" />
+				</entry>
+
+			</map>
+		</property>
+	</bean>
+
+	<bean id="msghandle_m2616" class="com.capcare.harbor.handler.device.m2616.MsgHandler" />
+	<bean id="msghandle_eelink" class="com.capcare.harbor.handler.device.eelink.MsgHandler" />
+	<bean id="msghandle_t808" class="com.capcare.harbor.handler.device.t808.MsgHandler" />
+	<bean id="msghandle_beidou" class="com.capcare.harbor.handler.device.beidou.MsgHandler" />
+	<bean id="msghandle_chengan" class="com.capcare.harbor.handler.device.chengan.MsgHandler" />
+	<bean id="msghandle_leader" class="com.capcare.harbor.handler.device.leader6920.MsgHandler" />
+
+
+	<bean id="msgHandler" class="org.springframework.beans.factory.config.MapFactoryBean">
+		<property name="sourceMap">
+			<map>
+				<entry key="M2616">
+					<ref local="msghandle_m2616" />
+				</entry>
+				<entry key="EELINK">
+					<ref local="msghandle_eelink" />
+				</entry>
+				<entry key="T808">
+					<ref local="msghandle_t808" />
+				</entry>
+				<entry key="BEIDOU">
+					<ref local="msghandle_beidou" />
+				</entry>
+				<entry key="CHENGAN">
+					<ref local="msghandle_chengan" />
+				</entry>
+				<entry key="LEADER">
+					<ref local="msghandle_leader" />
+				</entry>
+
+				<entry key="LEADER_ZHUCE">
+					<ref local="msghandle_leader" />
+				</entry>
+				<entry key="LEADER_XINTIAO">
+					<ref local="msghandle_leader" />
+				</entry>
+
+			</map>
+		</property>
+	</bean>
+
+	<bean id="dataService" class="org.springframework.beans.factory.config.MapFactoryBean">
+		<property name="sourceMap">
+			<map>
+				<entry key="POSITION">
+					<ref local="positionService" />
+				</entry>
+				<entry key="ALARM">
+					<ref local="alarmService" />
+				</entry>
+				<entry key="OBD">
+					<ref local="OBDService" />
+				</entry>
+				<entry key="OBD_ALARM">
+					<ref local="OBDService" />
+				</entry>
+				<entry key="FEE_CHECK">
+					<ref local="feeCheckService" />
+				</entry>
+				<entry key="SENT_MESSAGE">
+					<ref local="shortMessageService" />
+				</entry>
+				<entry key="USERDATA">
+					<ref local="conductorUserDataService" />
+				</entry>
+				<entry key="STATUS">
+					<ref local="conductorStatusService" />
+				</entry>
+				<entry key="GPS">
+					<ref local="conductorGPSService" />
+				</entry>
+				<entry key="FIREALARM">
+					<ref local="fireAlarmService" />
+				</entry>
+
+				<entry key="LEADER">
+					<ref local="fireAlarmService" />
+				</entry>
+
+				<entry key="LEADER_ZHUCE">
+					<ref local="fireAlarmService" />
+				</entry>
+				
+				
+				<entry key="LEADER_XINTIAO">
+					<ref local="fireAlarmService" />
+				</entry>
+
+
+
+			</map>
+		</property>
+	</bean>
+
+
+
+	<bean id="jedisConnectionFactory"
+		class="org.springframework.data.redis.connection.jedis.JedisConnectionFactory">
+		<property name="hostName" value="${redis.host}" />
+		<property name="port" value="${redis.port}" />
+<!-- 		<property name="database" value="${redis.dbIndex}" /> -->
+		<property name="password" value="${redis.password}" />
+	</bean>
+
+	<bean id="redisTemplate" class="org.springframework.data.redis.core.RedisTemplate">
+		<property name="connectionFactory" ref="jedisConnectionFactory" />
+		<property name="keySerializer">
+			<bean
+				class="org.springframework.data.redis.serializer.StringRedisSerializer" />
+		</property>
+		<property name="valueSerializer">
+			<bean
+				class="org.springframework.data.redis.serializer.StringRedisSerializer"></bean>
+		</property>
+		<property name="hashKeySerializer">
+			<bean
+				class="org.springframework.data.redis.serializer.StringRedisSerializer"></bean>
+		</property>
+		<property name="hashValueSerializer">
+			<bean
+				class="org.springframework.data.redis.serializer.StringRedisSerializer"></bean>
+		</property>
+	</bean>
+
+
+
+	<!-- 异步线程池 定时轮训设备 -->
+	<bean id="taskExecutor"
+		class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+		<!-- 核心线程数 -->
+		<property name="corePoolSize" value="50" />
+		<!-- 最大线程数 -->
+		<property name="maxPoolSize" value="200" />
+		<!-- 队列最大长度 >=mainExecutor.maxSize -->
+		<property name="queueCapacity" value="2000" />
+		<!-- 线程池维护线程所允许的空闲时间 -->
+		<property name="keepAliveSeconds" value="300" />
+		<!-- 线程池对拒绝任务(无线程可用)的处理策略 -->
+		<property name="rejectedExecutionHandler">
+			<!-- AbortPolicy:直接抛出java.util.concurrent.RejectedExecutionException异常 -->
+			<!-- CallerRunsPolicy:主线程直接执行该任务，执行完之后尝试添加下一个任务到线程池中，可以有效降低向线程池内添加任务的速度 -->
+			<!-- DiscardOldestPolicy:抛弃旧的任务、暂不支持；会导致被丢弃的任务无法再次被执行 -->
+			<!-- DiscardPolicy:抛弃当前任务、暂不支持；会导致被丢弃的任务无法再次被执行 -->
+			<bean class="java.util.concurrent.ThreadPoolExecutor$CallerRunsPolicy" />
+		</property>
+	</bean>
+
+
+	<bean id="springScheduleExecutorTask"
+		class="org.springframework.scheduling.concurrent.ScheduledExecutorTask">
+		<property name="runnable" ref="mainExecutor" />
+
+		<!-- 容器加载10秒后开始执行 -->
+		<property name="delay" value="10" />
+		<!-- 每次任务间隔 200ms秒 -->
+		<property name="period" value="200000" />
+	</bean>
+
+	<bean id="springScheduledExecutorFactoryBean"
+		class="org.springframework.scheduling.concurrent.ScheduledExecutorFactoryBean">
+		<property name="scheduledExecutorTasks">
+			<list>
+				<ref bean="springScheduleExecutorTask" />
+			</list>
+		</property>
+	</bean>
+
+	<bean id="deviceIpCache" class="com.capcare.harbor.service.cache.DeviceIpCache" />
+
+
+
+	<import resource="classpath:database.xml" />
+	<import resource="classpath:jms.xml" />
+</beans>
